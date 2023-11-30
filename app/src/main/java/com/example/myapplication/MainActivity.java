@@ -4,12 +4,16 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -17,74 +21,69 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
 
+
 public class MainActivity extends AppCompatActivity {
 
-    // Идентификатор уведомления
-    private static final int NOTIFY_ID = 101;
+    private TextView mInfoTextView;
+    private NotificationBroadcastReceiver mReceiver;
 
-    private int counter = 101;
-
-    // Идентификатор канала
-    private static String CHANNEL_ID = "Cat channel";
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
+        setTitle("NotificationListenerService Demo");
 
-        Button button = findViewById(R.id.button);
+        mInfoTextView = (TextView) findViewById(R.id.textView);
+        mReceiver = new NotificationBroadcastReceiver();
 
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("ru.alexanderklimov.NOTIFICATION_LISTENER_EXAMPLE");
+        registerReceiver(mReceiver, filter);
+    }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Notification Channel", NotificationManager.IMPORTANCE_DEFAULT);
-                    NotificationManager notificationManager = getSystemService(NotificationManager.class);
-                    assert notificationManager != null;
-                    notificationManager.createNotificationChannel(channel);
-                }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(mReceiver);
+    }
 
-                Intent notificationIntent = new Intent(MainActivity.this, MainActivity.this.getClass());
-                PendingIntent pendingIntent = PendingIntent.getActivity(MainActivity.this,
-                        0, notificationIntent,
-                        PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
+    public void onButtonClicked(View view){
 
-                Person murzik = new Person.Builder().setName("Мурзик").build();
-                Person vaska = new Person.Builder().setName("Васька").build();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel("My notification", "Notification Channel", NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            assert notificationManager != null;
+            notificationManager.createNotificationChannel(channel);
+        }
 
-                NotificationCompat.MessagingStyle messagingStyle = new NotificationCompat.MessagingStyle
-                        (murzik)
-                        .setConversationTitle("Android chat")
-                        .addMessage("Привет котаны!", System.currentTimeMillis(), murzik)
-                        .addMessage("А вы знали, что chat по-французски кошка?", System
-                                        .currentTimeMillis(),
-                                murzik)
-                        .addMessage("Круто!", System.currentTimeMillis(),
-                                vaska)
-                        .addMessage("Ми-ми-ми", System.currentTimeMillis(), vaska)
-                        .addMessage("Мурзик, откуда ты знаешь французский?", System.currentTimeMillis(),
-                                vaska)
-                        .addMessage("Шерше ля фам, т.е. ищите кошечку!", System.currentTimeMillis(),
-                                murzik);
+        if(view.getId() == R.id.buttonCreateNotification){
+            NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "My notification");
+            builder.setContentTitle("Важное уведомление");
+            builder.setContentText("Пора кормить кота!");
+            builder.setTicker("Хозяин, проснись!");
+            builder.setSmallIcon(R.drawable.cat);
+            builder.setAutoCancel(true);
+            manager.notify((int) System.currentTimeMillis(), builder.build());
+        }
+        else if(view.getId() == R.id.buttonClearNotification){
+            Intent intent = new Intent("com.example.myapplication.NOTIFICATION_LISTENER_SERVICE_EXAMPLE");
+            intent.putExtra("command", "clearall");
+            sendBroadcast(intent);
+        }
+        else if(view.getId() == R.id.buttonListNotification){
+            Intent intent = new Intent("com.example.myapplication.NOTIFICATION_LISTENER_SERVICE_EXAMPLE");
+            intent.putExtra("command", "list");
+            sendBroadcast(intent);
+        }
+    }
 
-                NotificationCompat.Builder builder =
-                        new NotificationCompat.Builder(MainActivity.this, CHANNEL_ID)
-                                .setSmallIcon(R.drawable.cat)
-                                .setContentIntent(pendingIntent)
-                                .addAction(R.drawable.cat, "Запустить активность",
-                                        pendingIntent)
-                                .setStyle(messagingStyle)
-                                .setAutoCancel(true); // автоматически закрыть уведомление после нажатия
+    class NotificationBroadcastReceiver extends BroadcastReceiver {
 
-                NotificationManagerCompat notificationManager =
-                        NotificationManagerCompat.from(MainActivity.this);
-                if (ActivityCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    return;
-                }
-                notificationManager.notify(NOTIFY_ID, builder.build());
-            }
-        });
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String temp = intent.getStringExtra("notification_event") + "\\n" + mInfoTextView.getText();
+            mInfoTextView.setText(temp);
+        }
     }
 }
